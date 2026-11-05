@@ -9,7 +9,7 @@ import { VehicleModelFactory, VehicleParts } from '../vehicles/VehicleModel';
 import { VehiclePhysics } from '../vehicles/VehiclePhysics';
 import { TrafficSystem } from '../world/TrafficSystem';
 import { InteriorManager } from '../world/InteriorManager';
-import { GameEconomy, VEHICLES_CATALOG } from '../economy/GameEconomy';
+import { GameEconomy, MISSIONS_CATALOG, VEHICLES_CATALOG } from '../economy/GameEconomy';
 import { SoundFX } from '../audio/SoundFX';
 
 export class GameEngine {
@@ -39,6 +39,11 @@ export class GameEngine {
   // Rain particle system
   private rainParticles: THREE.Points | null = null;
   private rainGeo: THREE.BufferGeometry | null = null;
+
+  // Active Mission 3D Checkpoint Marker
+  private missionBeaconGroup: THREE.Group | null = null;
+  private missionBeaconBeam: THREE.Mesh | null = null;
+  private missionBeaconRing: THREE.Mesh | null = null;
 
   // Game Settings & Controls
   public settings: GameSettings = {
@@ -134,6 +139,7 @@ export class GameEngine {
 
     // 5. Setup Rain Particles
     this.setupRainParticles();
+    this.setupMissionBeacon();
 
     // 6. Spawn Starting Vehicles in World
     this.spawnInitialVehicles();
@@ -165,6 +171,44 @@ export class GameEngine {
     });
     this.rainParticles = new THREE.Points(this.rainGeo, rainMat);
     this.scene.add(this.rainParticles);
+  }
+
+  private setupMissionBeacon() {
+    this.missionBeaconGroup = new THREE.Group();
+
+    // 1. Holographic Ground Pulse Ring
+    const ringGeo = new THREE.RingGeometry(3.5, 4.8, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xf1c40f,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85
+    });
+    this.missionBeaconRing = new THREE.Mesh(ringGeo, ringMat);
+    this.missionBeaconRing.rotation.x = -Math.PI / 2;
+    this.missionBeaconRing.position.y = 0.2;
+    this.missionBeaconGroup.add(this.missionBeaconRing);
+
+    // 2. Vertical Light Column beam rising 140m into sky
+    const beamGeo = new THREE.CylinderGeometry(0.8, 2.0, 140, 16);
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0xf1c40f,
+      transparent: true,
+      opacity: 0.35
+    });
+    this.missionBeaconBeam = new THREE.Mesh(beamGeo, beamMat);
+    this.missionBeaconBeam.position.y = 70;
+    this.missionBeaconGroup.add(this.missionBeaconBeam);
+
+    // 3. Floating rotating objective star/diamond
+    const diamondGeo = new THREE.OctahedronGeometry(2.2, 0);
+    const diamondMat = new THREE.MeshBasicMaterial({ color: 0xfff200 });
+    const diamond = new THREE.Mesh(diamondGeo, diamondMat);
+    diamond.position.y = 3.5;
+    this.missionBeaconGroup.add(diamond);
+
+    this.missionBeaconGroup.visible = false;
+    this.scene.add(this.missionBeaconGroup);
   }
 
   // Spawn Starter Hatchback, Showroom Supercar and Airport Plane
@@ -498,29 +542,39 @@ export class GameEngine {
 
   private checkMissionProgress() {
     const stats = GameEconomy.getStats();
-    if (!stats.activeMissionId) return;
+    if (!stats.activeMissionId) {
+      if (this.missionBeaconGroup) this.missionBeaconGroup.visible = false;
+      return;
+    }
+
+    const mission = MISSIONS_CATALOG.find(m => m.id === stats.activeMissionId);
+    if (!mission) {
+      if (this.missionBeaconGroup) this.missionBeaconGroup.visible = false;
+      return;
+    }
+
+    if (this.missionBeaconGroup) {
+      this.missionBeaconGroup.visible = true;
+      this.missionBeaconGroup.position.set(mission.targetPosition[0], 0, mission.targetPosition[2]);
+      if (this.missionBeaconRing) {
+        this.missionBeaconRing.rotation.z += 0.03;
+      }
+    }
 
     const currentPos = this.isDriving && this.activeVehicle ? this.activeVehicle.position : this.player.position;
 
-    // Mission 1: Courier
-    if (stats.activeMissionId === 'mission_courier') {
-      const target = new THREE.Vector3(-80, 0, -140);
-      if (currentPos.distanceTo(target) < 14) {
-        GameEconomy.completeActiveMission();
-      }
-    }
-    // Mission 2: Race
-    else if (stats.activeMissionId === 'mission_street_race') {
-      const target = new THREE.Vector3(160, 0, 60);
-      if (currentPos.distanceTo(target) < 16) {
-        GameEconomy.completeActiveMission();
-      }
-    }
     // Mission 4: Speed challenge
-    else if (stats.activeMissionId === 'mission_speed_trap') {
+    if (stats.activeMissionId === 'mission_speed_trap') {
       if (this.isDriving && this.activeVehicle && this.activeVehicle.speedKmH > 155) {
         GameEconomy.completeActiveMission();
       }
+      return;
+    }
+
+    // Distance to target checkpoint
+    const target = new THREE.Vector3(mission.targetPosition[0], 0, mission.targetPosition[2]);
+    if (currentPos.distanceTo(target) < 14) {
+      GameEconomy.completeActiveMission();
     }
   }
 

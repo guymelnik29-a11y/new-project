@@ -2,6 +2,7 @@
 
 import { BusinessConfig, MissionConfig, PlayerStats, PropertyConfig, VehicleConfig } from '../types';
 import { SoundFX } from '../audio/SoundFX';
+import confetti from 'canvas-confetti';
 
 export const VEHICLES_CATALOG: VehicleConfig[] = [
   {
@@ -393,6 +394,9 @@ class EconomyManager {
     if (newLevel > this.stats.level) {
       this.stats.level = newLevel;
       SoundFX.playMissionCompleteSound();
+      try {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      } catch {}
     }
   }
 
@@ -457,6 +461,9 @@ class EconomyManager {
       this.stats.ownedProperties.push(propertyId);
       this.stats.currentPropertyId = propertyId;
       this.notify();
+      try {
+        confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      } catch {}
       return true;
     }
     return false;
@@ -564,6 +571,9 @@ class EconomyManager {
     this.addMoney(mission.reward, `Completed: ${mission.title}`, `סיום משימה: ${mission.hebrewTitle}`);
     this.stats.activeMissionId = null;
     SoundFX.playMissionCompleteSound();
+    try {
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } });
+    } catch {}
     this.notify();
   }
 

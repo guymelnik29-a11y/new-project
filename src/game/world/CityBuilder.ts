@@ -207,6 +207,9 @@ export class CityBuilder {
     this.buildDealershipAndGarage();
     this.buildStreetFurnitureAndTrees();
     this.buildFloatingMarkers();
+    this.buildHighwaySigns();
+    this.buildRooftopNeonSigns();
+    this.buildStreetUrbanProps();
   }
 
   // Ground, Grass & Ocean
@@ -1106,6 +1109,154 @@ export class CityBuilder {
       this.scene.add(diamond);
 
       this.rotatingObjects.push({ mesh: diamond, speed: 0.03 });
+    });
+  }
+
+  // Highway Directional Signboards spanning over expressway
+  private buildHighwaySigns() {
+    const gantries = [
+      { x: -110, z: -40, textL: 'EXIT 1A: ✈ AIRPORT', textR: 'CITY CENTER ➔' },
+      { x: 90, z: -40, textL: 'EXIT 2B: 🏖 SOUTH BEACH', textR: 'SUNSET HILLS ➔' }
+    ];
+
+    gantries.forEach(g => {
+      // Steel Gantry Frame (Over highway deck at Y = 8.5)
+      const frameHeight = 15;
+      const gantryGroup = new THREE.Group();
+      const steelMat = new THREE.MeshStandardMaterial({ color: 0x576574, metalness: 0.8, roughness: 0.3 });
+
+      // Pillars on both sides of highway
+      [-10, 10].forEach(zOffset => {
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 7, 8), steelMat);
+        pillar.position.set(0, frameHeight - 3.5, zOffset);
+        gantryGroup.add(pillar);
+      });
+
+      // Top Crossbar
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 20), steelMat);
+      bar.position.set(0, frameHeight, 0);
+      gantryGroup.add(bar);
+
+      // Signboard Canvas Texture
+      const sCanvas = document.createElement('canvas');
+      sCanvas.width = 512;
+      sCanvas.height = 128;
+      const sCtx = sCanvas.getContext('2d')!;
+      sCtx.fillStyle = '#006233'; // Highway Green
+      sCtx.fillRect(0, 0, 512, 128);
+      sCtx.strokeStyle = '#ffffff';
+      sCtx.lineWidth = 6;
+      sCtx.strokeRect(6, 6, 500, 116);
+      sCtx.fillStyle = '#ffffff';
+      sCtx.font = 'bold 32px Chakra Petch, sans-serif';
+      sCtx.fillText(g.textL, 25, 52);
+      sCtx.fillText(g.textR, 25, 96);
+
+      const sTex = new THREE.CanvasTexture(sCanvas);
+      const signMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 3.2, 12),
+        new THREE.MeshStandardMaterial({ map: sTex, roughness: 0.4 })
+      );
+      signMesh.position.set(0, frameHeight - 1.2, 0);
+      gantryGroup.add(signMesh);
+
+      gantryGroup.position.set(g.x, 0, g.z);
+      this.scene.add(gantryGroup);
+    });
+  }
+
+  // Glowing Rooftop Neon Billboards on Skyscraper Tops
+  private buildRooftopNeonSigns() {
+    const signs = [
+      { text: 'MAZE BANK', x: 35, y: 112, z: -35, color: '#ff3838' },
+      { text: 'APEX MOTORS', x: 35, y: 97, z: 35, color: '#00d2d3' },
+      { text: 'SKYLINE GLOBAL', x: 135, y: 127, z: -35, color: '#feca57' },
+      { text: 'CYBER CLUB', x: 120, y: 67, z: -120, color: '#ff9ff3' }
+    ];
+
+    signs.forEach(s => {
+      const sCanvas = document.createElement('canvas');
+      sCanvas.width = 512;
+      sCanvas.height = 128;
+      const sCtx = sCanvas.getContext('2d')!;
+      sCtx.fillStyle = '#000000';
+      sCtx.fillRect(0, 0, 512, 128);
+      sCtx.fillStyle = s.color;
+      sCtx.font = 'bold 52px Chakra Petch, sans-serif';
+      sCtx.textAlign = 'center';
+      sCtx.textBaseline = 'middle';
+      sCtx.fillText(s.text, 256, 64);
+
+      const sTex = new THREE.CanvasTexture(sCanvas);
+      const signMat = new THREE.MeshBasicMaterial({
+        map: sTex,
+        transparent: true
+      });
+
+      const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(18, 4.5), signMat);
+      signMesh.position.set(s.x, s.y, s.z + 14);
+      this.scene.add(signMesh);
+
+      // Backside
+      const backMesh = signMesh.clone();
+      backMesh.position.set(s.x, s.y, s.z - 14);
+      backMesh.rotation.y = Math.PI;
+      this.scene.add(backMesh);
+    });
+  }
+
+  // Street Props: Fire Hydrants, Bus Shelters & Benches
+  private buildStreetUrbanProps() {
+    // 1. Fire Hydrants at street corners
+    const hydrantMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.4 });
+    const hydrantCoords = [
+      [-170, -80], [-80, -80], [10, -80], [100, -80],
+      [-170, 10], [-80, 10], [10, 10], [100, 10],
+      [-170, 100], [-80, 100], [10, 100], [100, 100]
+    ];
+
+    hydrantCoords.forEach(([hx, hz]) => {
+      const hGroup = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.9, 8), hydrantMat);
+      body.position.y = 0.45;
+      body.castShadow = true;
+      hGroup.add(body);
+
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), hydrantMat);
+      cap.position.y = 0.9;
+      hGroup.add(cap);
+
+      hGroup.position.set(hx, 0.17, hz);
+      this.scene.add(hGroup);
+    });
+
+    // 2. Bus Shelters along main avenues
+    const shelterCoords = [
+      [-90, -45], [0, 45], [90, 135]
+    ];
+
+    shelterCoords.forEach(([sx, sz]) => {
+      const sGroup = new THREE.Group();
+      const glassMat = new THREE.MeshStandardMaterial({ color: 0x81ecec, transparent: true, opacity: 0.5, roughness: 0.1 });
+      const metalMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.8 });
+
+      // Glass rear wall
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 0.1), glassMat);
+      glass.position.set(0, 1.5, 0);
+      sGroup.add(glass);
+
+      // Roof
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.2, 2.8), metalMat);
+      roof.position.set(0, 3.1, 1.2);
+      sGroup.add(roof);
+
+      // Wooden Bench inside
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.15, 0.6), new THREE.MeshStandardMaterial({ color: 0x8d6e63 }));
+      bench.position.set(0, 0.6, 0.8);
+      sGroup.add(bench);
+
+      sGroup.position.set(sx + 13.5, 0.17, sz);
+      this.scene.add(sGroup);
     });
   }
 
